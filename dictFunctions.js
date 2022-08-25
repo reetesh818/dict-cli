@@ -1,235 +1,203 @@
-// import { api_host, api_key } from '../config';
-// import inquirer from 'inquirer';
-const {api_host, api_key} = require('./config')
-// import { api_host, api_key } from './config';
-const axios = require('axios');
-let readline = require('readline');
-// let inquirer = require('inquirer')
+const {api_host,api_key} = require('./config')
+const Dictionary = require('./Dictionary');
+const colors = require('colors');
+const readline = require('readline');
 
-
-const clc = require('cli-color');
-let error = clc.red.bold;
-let notice = clc.blue;
-let warn = clc.yellow;
-let magenta = clc.magenta
-let blue = clc.blueBright
-
-let urldef,urlsyn,urlant,urlex;
-
-  
-let def_list = []
-let syn_list = []
-let ant_list = []
-
-
-function generateLink(word){
-  urldef = `${api_host}/word/${word}/definitions?api_key=${api_key}`;
-  urlsyn = `${api_host}/word/${word}/relatedWords?api_key=${api_key}`;
-  urlant = `${api_host}/word/${word}/relatedWords?api_key=${api_key}`;
-  urlex = `${api_host}/word/${word}/examples?api_key=${api_key}`;
-}
-
-async function checkAns(res,rand_word){
-  let ans = false;
-  if(res== rand_word) ans = true;
-  else{
-    if(syn_list.includes(rand_word)) ans  = true;
+//to create a jumbled word to offer as a hint
+const jumbleWord = (word) => {
+  if (word.length < 2) {
+    return word;
   }
-  return ans;
-
-}
-async function check(rand_word){
-  let answer = getInput('Guess the word.')
-    // if(checkAns(answer,rand_word))
-    if(true)
-    return true;
-    else return false;
-}
-
-function showOptions(){
-  console.log('1.Try again!');
-  console.log('2.Hint');
-  console.log('3.Skip');
-}
-
-function getInput(question){
-  let result;
-  // let rl = readline.createInterface(
-  //   process.stdin, process.stdout);
-  // rl.question(question, ans => {
-  //   result = ans;
-  //   rl.close();
-  // })
-  inquirer.prompt(question).then(ans => {return ans;})
-  return result;
-}
-
-let score = 0;
-async function play(urlrand){
-  let rand_word = await randomWord(urlrand);
-  generateLink(rand_word);
-  let rand = Math.floor(Math.random()*3);
-  definition(1);
-  synonyms(urlrand,1);
-  antonyms(urlrand,1); 
-  switch(rand){
-    case 0:
-      def_list[0];
-      break;
-    case 1:
-      syn_list[0];
-      break;
-    case 2:
-      ant_list[0];
-      break;
-  }
-  if(check(rand_word)){
-    score+=10;
-  }else {
-    let go = true;
-    score -= 2;
-    while(go){
-      showOptions();
-      option = getInput('What\'s your choice?'); 
-      switch(option){
-        case 1: break; //Try again
-        case 2: score -= 3; break; //another hint
-        case 3: score -=  4; break; //skip 
-      }
-      showScore(score);
+  let jumbled = [];
+  for (let i = 0; i < word.length; i++) {
+    let char = word[i];
+    let remainingChars =
+      word.slice(0, i) + word.slice(i + 1, word.length);
+    for (let jumble of jumbleWord(remainingChars)) {
+      jumbled.push(char + jumble);
     }
-    
   }
-}
+  return jumbled;
+};
 
+const readlineInterface = readline.createInterface(
+  process.stdin,
+  process.stdout
+);
+//Beginning of Helper functions
 
+//to take input from user
+const input = (questionText) => {
+  return new Promise((resolve, reject) => {
+    readlineInterface.question(questionText, resolve);
+  });
+};
 
-function set_definitions(list){
-  list.map((item,index) => {
-    def_list.push(item.text);
+//to show the user options after he/she fails to guess correct
+const showOptions = async () => {
+  console.log('Enter option\n1. To Try again\n2. Show Hint\n3. Skip \n4. Score \n5. Quit'.blue);
+  let option = await input('');
+  return Number(option);
+};
+
+const userGuess = async () => {
+  let response = await input('Enter your word\n'.blue);
+  return response;
+};
+
+const checkGuess = (word1, word2) => {
+  return word1 === word2;
+};
+
+//to display the result data in bullets 
+const display = (data) => {
+  data.map((item,index) => {
+      console.log(`${index+1}.${item.text || item}`.yellow)
   })
 }
-function set_synonyms(list){
-  list.map((item,index) => {
-    syn_list.push(item.text||item);
-  })
-}
-function set_antonyms(list){
-  
-  list.map((item,index) => {
-    ant_list.push(item.text || item);
-  })
-}
-async function definition(output=0) {
-  
-    await axios
-      .get(urldef)
-      .then((res) => {
-        set_definitions(res.data);
-        if(output == 0) display(def_list);
-      })
-      .catch((err) => displayError(err.response.data.error));
-  }
 
-  function displayError(message){
-    console.log(error(message));
+const displayAllDetails = (data) => {
+  console.log('Definitions'.blue);
+  display(data.definition);
+  console.log('Synonym'.blue);
+  display(data.synonym);
+  console.log('Examples'.blue);
+  display(data.example);
+}
+//End of Helper functions
+
+let def_index = 0;
+let syn_index = 0;
+let ant_index = 0;
+const showRandomHints = (wordDetails) => {
+  let hint;
+  if (wordDetails['antonym'] != undefined) {
+    hint = Math.floor(Math.random() * 4);
+  } else hint = Math.floor(Math.random() * 3);
+
+  if (hint === 0) {
+    if (def_index <= wordDetails['definition'].length) {
+      console.log('definition: ', wordDetails['definition'][def_index++].text);
+    }
+  } else if (hint === 1) {
+    if (syn_index <= wordDetails['synonym'].length) {
+      console.log('synonym: ', wordDetails['synonym'][syn_index++]);
+    }
+  } else if (hint === 2) {
+    let jumbled = jumbleWord(wordDetails['word']);
+    const temp = Math.floor(Math.random() * jumbled.length + 1);
+    console.log('jumbled: ', jumbled[temp]);
+  } else if (hint === 3) {
+    if (ant_index <= wordDetails['antonym'].length) {
+      console.log('antonym: ', wordDetails['antonym'][ant_index++]);
+    }
   }
-  
-  function displayWarn(message){
-    console.log(warn(message));
-  }
-  
-  function displayHead(message){
-    console.log(blue(message));
-  }
-  
-  function display(list){
-    list.map((item, index) =>
-    console.log(`${index + 1}.${item.text || item} \n`)
-  );
-  }
-  
-  
-  async function synonyms(urlrand,output = 0) {
-    await axios
-      .get(urlsyn)
-      .then((res) => {
-        let data = res.data;
-        if(data.length < 2 && data[0].relationshipType=="antonym") {
-          if(output==0)displayWarn("There are no synonym present in the dictionary.\n");
-          else play(urlrand);
+};
+
+const word = {
+  async def(opt) {
+    try {
+      const api = new Dictionary(api_key);
+      const response = await api.getDefinition(opt.word);
+      console.log('\nDefinitions\n'.blue.bold);
+      display(response);
+      process.exit();
+    } catch (err) {
+      console.error(err.message.red);
+    }
+  },
+  async syn(opt) {
+    try {
+      const api = new Dictionary(api_key);
+      const response = await api.getSynonym(opt.word);
+      console.log('\nSynonyms\n'.blue.bold);
+      display(response);
+      process.exit();
+    } catch (err) {
+      console.error(err.message.red);
+    }
+  },
+  async ant(opt) {
+    try {
+      const api = new Dictionary(api_key);
+      const response = await api.getAntonym(opt.word);
+      console.log('\nAntonyms\n'.blue.bold);
+      display(response);
+      process.exit();
+    } catch (err) {
+      console.error(err.message.red);
+    }
+  },
+  async ex(opt) {
+    try {
+      const api = new Dictionary(api_key);
+      const response = await api.getExample(opt.word);
+      console.log('\nExamples\n'.blue.bold);
+      display(response);
+      process.exit();
+    } catch (err) {
+      console.error(err.message.red);
+    }
+  },
+  async wod() {
+    try {
+      const api = new Dictionary(api_key);
+      const response = await api.getRandomWord();
+      console.log('\nWord of the Day\n'.blue.bold);
+      console.log(response.word);
+      displayAllDetails(response);
+      process.exit();
+    } catch (err) {
+      console.error(err.message.red);
+    }
+  },
+  async play() {
+    let score = 0;
+    let api = new Dictionary(api_key);
+
+    let play_again = true;
+    console.log('\nLets Play'.bgGreen.bold);
+    while (play_again) {
+      console.log('------------------------'.magenta);
+      console.log('Score:'.green,score);
+      const wordDetails = await api.getRandomWord();
+
+      showRandomHints(wordDetails);
+      while (true) {
+        const guess = await userGuess();
+        let correct = checkGuess(guess, wordDetails['word']);
+
+        if (!correct) {
+          console.log('Incorrect Answer'.red);
+          score = score > 0 ? score-4 : 0;
+          let option = await showOptions();
+          if (option === 2) {
+            score = score > 0 ? score-3 : 0;
+            showRandomHints(wordDetails);
+          }else if(option===3){ 
+            score = score > 0 ? score - 4 : 0;
+            api = new Dictionary(api_key);
+            console.log('Word\n'.blue,wordDetails.word);
+            displayAllDetails(wordDetails);
+            break;
+          }else if(option == 4){
+            console.log('Score'.green,score);
+            
+          }
+          else if (option === 5) {
+            play_again = false;
+            break;
+          }
         } else {
-            data.map((items, index) => {
-                  if (items.relationshipType == "synonym") {
-                    set_synonyms(items.words); 
-                    if(output == 0) { display(syn_list);}
-                  } 
-                });
+          score += 10;
+          console.log('Correct answer'.green, score);
+          break;
         }
-        
-      })
-      .catch((err) => displayError(err.response.data.error));
-  }
-  
-  async function antonyms(urlrand,output = 0) {
-    await axios
-      .get(urlant)
-      .then((res) => {
-        let data = res.data;
-       
-        if(data.length < 2 && data[0].relationshipType=="synonym") {
-          if(output == 0) displayWarn("There are no antonyms present in the dictionary.\n");
-          else  play(urlrand);
-        }else {
-          data.map((items, index) => {
-              if (items.relationshipType == "antonym") {
-                set_antonyms(items.words);
-                if(output == 0) {
-                  display(ant_list); 
-                }    }
-            });
-        }
-      })
-      .catch(err => displayError(err.response.data.error));
-  }
-  
-  async function examples() {
-    await axios
-      .get(urlex)
-      .then((res) => {
-        let data = res.data;
-        display(data.examples);
-      })
-      .catch((err) => displayError(err.response.data.error));
-  }
-  
-  async function all() {
-    displayHead("Definitions\n");
-    await definition(urldef);
-    displayHead("Antonyms\n");
-    await antonyms(urlsyn);
-    displayHead("Synonyms\n");
-    await synonyms(urlant);
-    displayHead("Examples\n");
-    await examples(urlex);
-  }
-  async function randomWord(url){
-    return await axios.get(url).then(res => {
-      return res.data.word;
-    })
-  }
-  
-  module.exports = {
-    definition,
-    display,
-    displayError,
-    displayHead,
-    displayWarn,
-    synonyms,
-    antonyms,
-    examples,
-    all,
-    play,
-    randomWord,
-    generateLink,
-  }
+      }
+      
+    }
+    if (!play_again) process.exit();
+  },
+};
+
+module.exports = word;

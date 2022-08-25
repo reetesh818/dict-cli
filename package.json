@@ -1,18 +1,17 @@
 {
-  "dependencies": {
-    "axios": "^0.27.2",
-    "cli-color": "^2.0.3",
-    "commander": "^9.4.0",
-    "inquirer": "^9.1.0"
-  },
   "name": "dict-cli",
   "version": "1.0.0",
-  "main": "dict.js",
+  "description": "",
+  "main": "config.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
+  "author": "Reetesh Tiwari",
   "license": "ISC",
-  "description": ""
+  "dependencies": {
+    "axios": "^0.27.2",
+    "colors": "^1.4.0",
+    "commander": "^9.4.0"
+  }
 }
