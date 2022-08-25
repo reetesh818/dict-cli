@@ -19,5 +19,4 @@ Commands:
   Note: To make it executable even without the node keyword,just make the script executable by using this command: 
   
   command : chmod +x dict.js
-  
  
